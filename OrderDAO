@@ -45,7 +45,7 @@ public static int CheckDuplicatedOrders(string guid)
     return numOrder; 
 }
 
-public static void InvalidarOrcamentosDuplicados(string guid)
+public static void DisableDuplicatedOrders(string guid)
 {
     SqlConnection sqlConnection = null;
     string query = "";
