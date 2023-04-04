@@ -1,0 +1,89 @@
+public static int CheckDuplicatedOrders(string guid)
+{
+		SqlDataReader sqlDataReader = null;
+    SqlConnection sqlConnection = null;
+    int numOrder = 0;
+
+    try
+    {
+        string query = @"
+            SELECT ORDER_NUM = COUNT(*)
+            FROM DBX1..ORDERS 
+            WHERE O_GUID = '@Guid";
+
+        sqlConnection = new SqlConnection(MyDb.ConnStr());
+        sqlConnection.Open();
+
+        SqlCommand cmd = new SqlCommand(query, sqlConnection);
+        cmd.Parameters.Add("@Guid", SqlDbType.Varchar).Value = guid;
+
+        sqlDataReader = cmd.ExecuteReader();
+        if (sqlDataReader.HasRows)
+        {
+            while (sqlDataReader.Read())
+            {
+                numOrder = Convert.ToInt32(sqlDataReader["ORDER_NUM"]);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Util.LogToEventViewer(ex);
+    }
+    finally
+    {
+        if (sqlDataReader != null)
+        {
+            sqlDataReader.Close();
+        }
+        if (sqlConnection != null)
+        {
+            sqlConnection.Close();
+        }
+    }
+
+    return numOrder; 
+}
+
+public static void InvalidarOrcamentosDuplicados(string guid)
+{
+    SqlConnection sqlConnection = null;
+    string query = "";
+
+    try
+    {
+        sqlConnection = new SqlConnection(MyDb.ConnStr());
+        sqlConnection.Open();
+
+        query = string.Format(@"
+            WITH CTE_ORDER_DUPE AS (
+              SELECT * FROM (
+                SELECT O_CODE, O_GUID, O_STATUS
+                  , ROW_NUMBER() OVER (PARTITION BY O_GUID ORDER BY O_CODE) AS LINE_NUM
+                FROM DBX1..ORDERS 
+                WHERE O_GUID = @Guid )
+              AS Q WHERE LINE_NUM > 1
+            ) -- SELECT * FROM CTE_ORDER_DUPE
+            UPDATE DBX1..ORDERS SET O_STATUS = 'X' WHERE O_CODE IN 
+            (
+              SELECT CJ_CODIGO 
+              FROM CTE_ORDER_DUPE
+            )";
+
+        SqlCommand cmd = new SqlCommand(query, sqlConnection);
+				cmd.Parameters.Add("@Guid", SqlDbType.Varchar).Value = guid;
+        cmd.ExecuteNonQuery();
+    }
+    catch (Exception e)
+    {
+        Util.LogToEventViewer("Query: " + query, e);
+        throw e;
+    }
+    finally
+    {
+        if (sqlConnection != null)
+        {
+            sqlConnection.Close();
+        }
+    }
+}
